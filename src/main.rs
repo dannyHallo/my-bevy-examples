@@ -5,19 +5,20 @@ use rand::{rngs::ThreadRng, thread_rng, Rng};
 
 fn main() {
     let mut app = App::new();
-    app.add_plugins(
-        DefaultPlugins
-            .set(WindowPlugin {
-                primary_window: Some(Window {
-                    title: "Flappy Bird".to_string(),
-                    position: WindowPosition::Centered(MonitorSelection::Primary),
-                    resolution: Vec2::new(512.0, 512.0).into(),
-                    ..Default::default()
-                }),
+
+    let using_plugins = DefaultPlugins
+        .set(WindowPlugin {
+            primary_window: Some(Window {
+                title: "Flappy Bird".to_string(),
+                position: WindowPosition::Centered(MonitorSelection::Primary),
+                resolution: Vec2::new(512.0, 512.0).into(),
                 ..Default::default()
-            })
-            .set(ImagePlugin::default_nearest()),
-    );
+            }),
+            ..Default::default()
+        })
+        .set(ImagePlugin::default_nearest());
+
+    app.add_plugins(using_plugins);
     app.add_systems(Startup, setup_level);
     app.add_systems(Update, (update_bird, update_obstacles));
     app.run();
@@ -30,15 +31,13 @@ const GRAVITY: f32 = 2000.0;
 const VELOCITY_TO_ROTATION_RATIO: f32 = 7.5;
 
 // obstacles
-const OBSTACLE_AMOUNT: i32 = 5;
+const OBSTACLE_AMOUNT: i32 = 3;
 const OBSTACLE_WIDTH: f32 = 32.0;
 const OBSTACLE_HEIGHT: f32 = 144.0;
 const OBSTACLE_VERTICLE_OFFSET: f32 = 30.0;
 const OBSTACLE_GAP_SIZE: f32 = 15.0;
 const OBSTACLE_SPACING: f32 = 60.0;
 const OBSTACLE_SCROLL_SPEED: f32 = 150.0;
-
-// TODO: dont need to be public?
 
 #[derive(Resource)]
 struct GameManager {
@@ -48,7 +47,7 @@ struct GameManager {
 
 #[derive(Component)]
 struct Bird {
-    pub y_velocity: f32,
+    y_velocity: f32,
 }
 
 #[derive(Component)]
@@ -61,17 +60,20 @@ fn update_obstacles(
     game_manager: Res<GameManager>,
     mut obstacle_query: Query<(&mut Obstacle, &mut Transform)>,
 ) {
-    let mut rand = thread_rng();
-    let y_offset = generate_offset(&mut rand);
+    let mut rand = thread_rng(); // Random number generator
     for (obstacle, mut transform) in obstacle_query.iter_mut() {
         transform.translation.x -= time.delta_secs() * OBSTACLE_SCROLL_SPEED;
 
+        // If the pipe goes off-screen to the left, reposition it to the right
         if transform.translation.x + OBSTACLE_WIDTH * PIXEL_RATIO / 2.0
             < -game_manager.window_dimensions.x / 2.0
         {
             transform.translation.x += OBSTACLE_AMOUNT as f32 * OBSTACLE_SPACING * PIXEL_RATIO;
+
+            // Generate a new vertical offset for the repositioned pipe
+            let y_offset = generate_offset(&mut rand);
             transform.translation.y =
-                get_centered_pipe_position() + obstacle.pipe_direction * y_offset;
+                obstacle.pipe_direction * get_centered_pipe_position() + y_offset;
         }
     }
 }
@@ -141,7 +143,7 @@ fn update_bird(
                     && (pipe_transform.translation.x - transform.translation.x).abs()
                         < OBSTACLE_WIDTH * PIXEL_RATIO / 2.0
                 {
-                    dead = true;
+                    // dead = true; // TODO:
                     break;
                 }
             }
